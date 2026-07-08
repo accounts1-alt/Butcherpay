@@ -1,7 +1,20 @@
+import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { AdjustmentRow, EntryRow, MerchantRow, ReconciliationTotalRow } from "@/lib/supabase/types";
 import { reconcile } from "@/lib/reconciliation";
 import { formatMoney } from "@/lib/money";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardValue } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { createAdjustment } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +30,9 @@ export default async function TransactionDetailPage({
     return (
       <div>
         <h1 className="text-2xl font-semibold mb-2">Transaction detail</h1>
-        <p className="text-sm text-black/60 dark:text-white/60">
+        <p className="text-sm text-muted-foreground">
           Missing date, location, or payment method. Open this page from the{" "}
-          <a className="underline" href="/dashboard">
+          <a className="underline text-primary" href="/dashboard">
             Dashboard
           </a>
           .
@@ -85,120 +98,151 @@ export default async function TransactionDetailPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">
+        <h1 className="text-2xl font-semibold tracking-tight">
           {date} · {location} · {paymentMethod?.name}
         </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Every entry recorded for this date, location, and payment method.
+        </p>
       </div>
 
-      <div className="flex gap-8 rounded border border-black/10 dark:border-white/10 p-4 text-sm">
-        <div>
-          <div className="text-black/50 dark:text-white/50">POS total</div>
-          <div className="font-medium">{formatMoney(posTotal)}</div>
-        </div>
-        <div>
-          <div className="text-black/50 dark:text-white/50">Recorded total</div>
-          <div className="font-medium">{formatMoney(recordedTotal)}</div>
-        </div>
-        <div>
-          <div className="text-black/50 dark:text-white/50">Gap</div>
-          <div className={`font-medium ${matched ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
-            {formatMoney(gap)} {matched ? "(matched)" : ""}
-          </div>
-        </div>
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>POS total</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <CardValue>{formatMoney(posTotal)}</CardValue>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>Recorded total</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <CardValue>{formatMoney(recordedTotal)}</CardValue>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>Gap</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex items-center gap-2">
+              <CardValue className={matched ? "text-success" : "text-destructive"}>
+                {formatMoney(gap)}
+              </CardValue>
+              <Badge variant={matched ? "success" : "destructive"}>
+                {matched ? (
+                  <>
+                    <CheckCircle2 className="h-3 w-3" /> Matched
+                  </>
+                ) : (
+                  <>
+                    <TriangleAlert className="h-3 w-3" /> Gap
+                  </>
+                )}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="text-left border-b border-black/10 dark:border-white/10">
-            <th className="py-2 pr-4">Ref</th>
-            <th className="py-2 pr-4">Type</th>
-            <th className="py-2 pr-4">Merchant</th>
-            <th className="py-2 pr-4">Amount</th>
-            <th className="py-2 pr-4">Fee</th>
-            <th className="py-2 pr-4">Net</th>
-            <th className="py-2 pr-4">Status</th>
-            <th className="py-2 pr-4">Reconciles</th>
-            <th className="py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {entryRows.map((entry) => {
-            const merchant = entry.merchant_id ? merchantById.get(entry.merchant_id) : undefined;
-            const entryAdjustments = adjustmentsByEntry.get(entry.id) ?? [];
-            const latestAdjustment = entryAdjustments[entryAdjustments.length - 1];
-            return (
-              <tr key={entry.id} className="border-b border-black/5 dark:border-white/5 align-top">
-                <td className="py-2 pr-4">#{entry.reference}</td>
-                <td className="py-2 pr-4">{entry.type}</td>
-                <td className="py-2 pr-4">{merchant?.name ?? "—"}</td>
-                <td className="py-2 pr-4">
-                  {formatMoney(entry.amount)}
-                  {latestAdjustment && (
-                    <span className="block text-xs text-black/50 dark:text-white/50">
-                      corrected to {formatMoney(latestAdjustment.corrected_amount)}
-                    </span>
-                  )}
-                </td>
-                <td className="py-2 pr-4">{formatMoney(entry.fee)}</td>
-                <td className="py-2 pr-4">{formatMoney(entry.net)}</td>
-                <td className="py-2 pr-4">{entry.lifecycle_status}</td>
-                <td className="py-2 pr-4">{entry.reconciles_against_pos ? "Yes" : "No"}</td>
-                <td className="py-2">
-                  <details>
-                    <summary className="cursor-pointer text-xs underline">Adjust</summary>
-                    <form action={createAdjustment} className="mt-2 flex flex-col gap-2 w-56">
-                      <input type="hidden" name="entry_id" value={entry.id} />
-                      <input type="hidden" name="original_amount" value={entry.amount} />
-                      <input type="hidden" name="return_to" value={returnTo} />
-                      <label className="text-xs">
-                        Corrected amount
-                        <input
-                          name="corrected_amount"
-                          type="number"
-                          step="0.01"
-                          required
-                          defaultValue={entry.amount}
-                          className="w-full mt-0.5 border rounded px-2 py-1 text-sm border-black/20 dark:border-white/20 bg-transparent"
-                        />
-                      </label>
-                      <label className="text-xs">
-                        Reason
-                        <input
-                          name="reason"
-                          required
-                          className="w-full mt-0.5 border rounded px-2 py-1 text-sm border-black/20 dark:border-white/20 bg-transparent"
-                        />
-                      </label>
-                      <button
-                        type="submit"
-                        className="rounded bg-foreground text-background px-2 py-1 text-xs"
-                      >
-                        Save adjustment
-                      </button>
-                    </form>
-                    {entryAdjustments.length > 0 && (
-                      <ul className="mt-2 text-xs text-black/60 dark:text-white/60 space-y-1">
-                        {entryAdjustments.map((adj) => (
-                          <li key={adj.id}>
-                            {formatMoney(adj.original_amount)} → {formatMoney(adj.corrected_amount)}: {adj.reason}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </details>
-                </td>
-              </tr>
-            );
-          })}
-          {entryRows.length === 0 && (
-            <tr>
-              <td colSpan={9} className="py-4 text-black/50 dark:text-white/50">
-                No entries recorded for this date, location, and payment method.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ref</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Merchant</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Fee</TableHead>
+                <TableHead>Net</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Reconciles</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entryRows.map((entry) => {
+                const merchant = entry.merchant_id ? merchantById.get(entry.merchant_id) : undefined;
+                const entryAdjustments = adjustmentsByEntry.get(entry.id) ?? [];
+                const latestAdjustment = entryAdjustments[entryAdjustments.length - 1];
+                return (
+                  <TableRow key={entry.id} className="align-top">
+                    <TableCell className="text-muted-foreground">#{entry.reference}</TableCell>
+                    <TableCell>{entry.type}</TableCell>
+                    <TableCell>{merchant?.name ?? "—"}</TableCell>
+                    <TableCell>
+                      {formatMoney(entry.amount)}
+                      {latestAdjustment && (
+                        <span className="block text-xs text-muted-foreground">
+                          corrected to {formatMoney(latestAdjustment.corrected_amount)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>{formatMoney(entry.fee)}</TableCell>
+                    <TableCell className="font-medium">{formatMoney(entry.net)}</TableCell>
+                    <TableCell className="capitalize">{entry.lifecycle_status}</TableCell>
+                    <TableCell>
+                      <Badge variant={entry.reconciles_against_pos ? "secondary" : "muted"}>
+                        {entry.reconciles_against_pos ? "Yes" : "No"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <details>
+                        <summary className="cursor-pointer text-xs text-primary underline underline-offset-2">
+                          Adjust
+                        </summary>
+                        <form action={createAdjustment} className="mt-2 flex flex-col gap-2 w-56">
+                          <input type="hidden" name="entry_id" value={entry.id} />
+                          <input type="hidden" name="original_amount" value={entry.amount} />
+                          <input type="hidden" name="return_to" value={returnTo} />
+                          <label className="text-xs text-muted-foreground">
+                            Corrected amount
+                            <Input
+                              name="corrected_amount"
+                              type="number"
+                              step="0.01"
+                              required
+                              defaultValue={entry.amount}
+                              className="mt-0.5"
+                            />
+                          </label>
+                          <label className="text-xs text-muted-foreground">
+                            Reason
+                            <Input name="reason" required className="mt-0.5" />
+                          </label>
+                          <Button type="submit" size="sm">
+                            Save adjustment
+                          </Button>
+                        </form>
+                        {entryAdjustments.length > 0 && (
+                          <ul className="mt-2 text-xs text-muted-foreground space-y-1">
+                            {entryAdjustments.map((adj) => (
+                              <li key={adj.id}>
+                                {formatMoney(adj.original_amount)} → {formatMoney(adj.corrected_amount)}: {adj.reason}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </details>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {entryRows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-muted-foreground">
+                    No entries recorded for this date, location, and payment method.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,7 +1,9 @@
+import { Wallet } from "lucide-react";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { AdjustmentRow, EntryRow, PaymentMethodRow } from "@/lib/supabase/types";
 import { effectiveNet } from "@/lib/effectiveAmount";
 import { formatMoney } from "@/lib/money";
+import { Card, CardContent, CardHeader, CardTitle, CardValue } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -59,43 +61,42 @@ export default async function MoneyHeldPage() {
   const grandTotal = rows.reduce((sum, row) => sum + row.held, 0);
 
   return (
-    <div className="space-y-6 max-w-xl">
-      <h1 className="text-2xl font-semibold">Money currently held</h1>
-      <p className="text-sm text-black/60 dark:text-white/60">
-        Money taken but not yet banked, by payment method.
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Money currently held</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Money taken but not yet banked, by payment method.
+        </p>
+      </div>
 
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="text-left border-b border-black/10 dark:border-white/10">
-            <th className="py-2">Payment method</th>
-            <th className="py-2 text-right">Held</th>
-          </tr>
-        </thead>
-        <tbody>
+      <Card className="bg-primary text-primary-foreground border-primary">
+        <CardContent className="flex items-center justify-between p-6">
+          <div>
+            <div className="text-sm opacity-80">Total held</div>
+            <div className="text-4xl font-semibold tracking-tight mt-1">
+              {formatMoney(grandTotal)}
+            </div>
+          </div>
+          <Wallet className="h-10 w-10 opacity-70" />
+        </CardContent>
+      </Card>
+
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nothing currently held — everything is banked.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {rows.map((row) => (
-            <tr key={row.method.id} className="border-b border-black/5 dark:border-white/5">
-              <td className="py-2">{row.method.name}</td>
-              <td className="py-2 text-right">{formatMoney(row.held)}</td>
-            </tr>
+            <Card key={row.method.id}>
+              <CardHeader className="pb-2">
+                <CardTitle className="capitalize">{row.method.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <CardValue>{formatMoney(row.held)}</CardValue>
+              </CardContent>
+            </Card>
           ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={2} className="py-4 text-black/50 dark:text-white/50">
-                Nothing currently held — everything is banked.
-              </td>
-            </tr>
-          )}
-        </tbody>
-        {rows.length > 0 && (
-          <tfoot>
-            <tr className="border-t border-black/10 dark:border-white/10 font-medium">
-              <td className="py-2">Total</td>
-              <td className="py-2 text-right">{formatMoney(grandTotal)}</td>
-            </tr>
-          </tfoot>
-        )}
-      </table>
+        </div>
+      )}
     </div>
   );
 }

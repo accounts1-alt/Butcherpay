@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import type { MerchantRow, PaymentMethodRow } from "@/lib/supabase/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { createEntry } from "./actions";
 
 const TYPES_BY_DIRECTION: Record<string, { value: string; label: string }[]> = {
@@ -78,220 +86,202 @@ export function EntryForm({
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-semibold">Add an entry</h1>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Add an entry</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Record money moving in or out of the business.
+        </p>
+      </div>
 
       {successBanner && (
-        <div className="rounded bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200 px-3 py-2 text-sm">
-          Entry added.
+        <div className="flex items-center gap-2 rounded-lg bg-success/15 text-success px-3 py-2.5 text-sm font-medium">
+          <CheckCircle2 className="h-4 w-4" /> Entry added.
         </div>
       )}
 
-      <form action={createEntry} className="space-y-4">
-        <input type="hidden" name="amount" value={effectiveAmount} />
-        <input type="hidden" name="fee" value={cash ? "0" : fee} />
-        <input type="hidden" name="lifecycle_status" value={initialStage} />
+      <Card>
+        <CardContent className="pt-5">
+          <form action={createEntry} className="space-y-5">
+            <input type="hidden" name="amount" value={effectiveAmount} />
+            <input type="hidden" name="fee" value={cash ? "0" : fee} />
+            <input type="hidden" name="lifecycle_status" value={initialStage} />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs mb-1" htmlFor="date">
-              Date
-            </label>
-            <input
-              id="date"
-              name="date"
-              type="date"
-              required
-              defaultValue={new Date().toISOString().slice(0, 10)}
-              className="w-full border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-xs mb-1" htmlFor="location">
-              Location
-            </label>
-            <input
-              id="location"
-              name="location"
-              required
-              list="location-options"
-              defaultValue={locations[0] ?? ""}
-              className="w-full border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-            />
-            <datalist id="location-options">
-              {locations.map((loc) => (
-                <option key={loc} value={loc} />
-              ))}
-            </datalist>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs mb-1">Direction</label>
-            <div className="flex gap-4 py-1.5">
-              {(["in", "out"] as const).map((d) => (
-                <label key={d} className="flex items-center gap-1.5 text-sm">
-                  <input
-                    type="radio"
-                    name="direction"
-                    value={d}
-                    checked={direction === d}
-                    onChange={() => setDirection(d)}
-                  />
-                  {d === "in" ? "Money in" : "Money out"}
-                </label>
-              ))}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  name="date"
+                  type="date"
+                  required
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  name="location"
+                  required
+                  list="location-options"
+                  defaultValue={locations[0] ?? ""}
+                />
+                <datalist id="location-options">
+                  {locations.map((loc) => (
+                    <option key={loc} value={loc} />
+                  ))}
+                </datalist>
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="block text-xs mb-1" htmlFor="type">
-              Type
-            </label>
-            <select
-              id="type"
-              name="type"
-              required
-              className="w-full border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-            >
-              {TYPES_BY_DIRECTION[direction].map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
 
-        <div>
-          <label className="block text-xs mb-1" htmlFor="payment_method_id">
-            Payment method
-          </label>
-          <select
-            id="payment_method_id"
-            name="payment_method_id"
-            required
-            value={paymentMethodId}
-            onChange={(e) => {
-              setPaymentMethodId(e.target.value);
-              setMerchantId("");
-              setFee("0");
-            }}
-            className="w-full border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-          >
-            {paymentMethods
-              .filter((pm) => pm.active)
-              .map((pm) => (
-                <option key={pm.id} value={pm.id}>
-                  {pm.name}
-                </option>
-              ))}
-          </select>
-        </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Direction</Label>
+                <div className="flex gap-1 rounded-md border border-input p-1 mt-1">
+                  {(["in", "out"] as const).map((d) => (
+                    <label
+                      key={d}
+                      className={cn(
+                        "flex-1 text-center rounded px-2 py-1 text-sm cursor-pointer transition-colors",
+                        direction === d
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-accent"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="direction"
+                        value={d}
+                        checked={direction === d}
+                        onChange={() => setDirection(d)}
+                        className="sr-only"
+                      />
+                      {d === "in" ? "Money in" : "Money out"}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="type">Type</Label>
+                <Select id="type" name="type" required>
+                  {TYPES_BY_DIRECTION[direction].map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
 
-        {availableMerchants.length > 0 && (
-          <div>
-            <label className="block text-xs mb-1" htmlFor="merchant_id">
-              Merchant
-            </label>
-            <select
-              id="merchant_id"
-              name="merchant_id"
-              value={merchantId}
-              onChange={(e) => handleMerchantChange(e.target.value)}
-              className="w-full border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-            >
-              <option value="">—</option>
-              {availableMerchants.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+            <div>
+              <Label htmlFor="payment_method_id">Payment method</Label>
+              <Select
+                id="payment_method_id"
+                name="payment_method_id"
+                required
+                value={paymentMethodId}
+                onChange={(e) => {
+                  setPaymentMethodId(e.target.value);
+                  setMerchantId("");
+                  setFee("0");
+                }}
+              >
+                {paymentMethods
+                  .filter((pm) => pm.active)
+                  .map((pm) => (
+                    <option key={pm.id} value={pm.id}>
+                      {pm.name}
+                    </option>
+                  ))}
+              </Select>
+            </div>
 
-        {cash ? (
-          <div>
-            <label className="block text-xs mb-2">Cash denomination count</label>
-            <div className="grid grid-cols-4 gap-2">
-              {CASH_DENOMINATIONS.map((denom) => (
-                <div key={denom}>
-                  <label className="block text-[11px] mb-0.5 text-black/60 dark:text-white/60">
-                    {denom >= 1 ? `£${denom}` : `${denom * 100}p`}
-                  </label>
-                  <input
+            {availableMerchants.length > 0 && (
+              <div>
+                <Label htmlFor="merchant_id">Merchant</Label>
+                <Select
+                  id="merchant_id"
+                  name="merchant_id"
+                  value={merchantId}
+                  onChange={(e) => handleMerchantChange(e.target.value)}
+                >
+                  <option value="">—</option>
+                  {availableMerchants.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+
+            {cash ? (
+              <div>
+                <Label>Cash denomination count</Label>
+                <div className="grid grid-cols-4 gap-2 mt-1">
+                  {CASH_DENOMINATIONS.map((denom) => (
+                    <div key={denom}>
+                      <label className="block text-[11px] mb-0.5 text-muted-foreground">
+                        {denom >= 1 ? `£${denom}` : `${denom * 100}p`}
+                      </label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={denominationCounts[denom] ?? ""}
+                        onChange={(e) =>
+                          setDenominationCounts((prev) => ({ ...prev, [denom]: e.target.value }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-sm rounded-md bg-muted/60 px-3 py-2">
+                  Total: <span className="font-semibold">£{cashTotal.toFixed(2)}</span>
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="amount-input">Amount</Label>
+                  <Input
+                    id="amount-input"
                     type="number"
                     min={0}
-                    step={1}
-                    value={denominationCounts[denom] ?? ""}
-                    onChange={(e) =>
-                      setDenominationCounts((prev) => ({ ...prev, [denom]: e.target.value }))
-                    }
-                    className="w-full border rounded px-2 py-1 text-sm border-black/20 dark:border-white/20 bg-transparent"
+                    step="0.01"
+                    required
+                    value={amount}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      if (merchantId) handleMerchantChange(merchantId);
+                    }}
                   />
                 </div>
-              ))}
-            </div>
-            <p className="mt-2 text-sm">
-              Total: <span className="font-medium">£{cashTotal.toFixed(2)}</span>
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs mb-1" htmlFor="amount-input">
-                Amount
-              </label>
-              <input
-                id="amount-input"
-                type="number"
-                min={0}
-                step="0.01"
-                required
-                value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  if (merchantId) handleMerchantChange(merchantId);
-                }}
-                className="w-full border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-xs mb-1" htmlFor="fee-input">
-                Fee
-              </label>
-              <input
-                id="fee-input"
-                type="number"
-                min={0}
-                step="0.01"
-                value={fee}
-                onChange={(e) => setFee(e.target.value)}
-                className="w-full border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-              />
-            </div>
-          </div>
-        )}
+                <div>
+                  <Label htmlFor="fee-input">Fee</Label>
+                  <Input
+                    id="fee-input"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={fee}
+                    onChange={(e) => setFee(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
 
-        <div>
-          <label className="block text-xs mb-1" htmlFor="notes">
-            Notes
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            rows={2}
-            className="w-full border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-          />
-        </div>
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea id="notes" name="notes" rows={2} />
+            </div>
 
-        <button
-          type="submit"
-          className="rounded bg-foreground text-background px-4 py-2 text-sm font-medium"
-        >
-          Add entry
-        </button>
-      </form>
+            <Button type="submit" size="lg" className="w-full">
+              Add entry
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
