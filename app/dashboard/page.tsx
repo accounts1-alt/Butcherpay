@@ -1,10 +1,17 @@
 import Link from "next/link";
+import { Check, TriangleAlert } from "lucide-react";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { PaymentMethodRow, ReconciliationTotalRow } from "@/lib/supabase/types";
 import { listKnownLocations } from "@/lib/locations";
 import { resolveDateRange, type DateRangeKind } from "@/lib/dateRanges";
 import { reconcile } from "@/lib/reconciliation";
 import { formatMoney } from "@/lib/money";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -63,116 +70,110 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-
-      <form method="get" className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="block text-xs mb-1" htmlFor="location">
-            Location
-          </label>
-          <select
-            id="location"
-            name="location"
-            defaultValue={location}
-            className="border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-          >
-            {locations.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs mb-1" htmlFor="range">
-            Range
-          </label>
-          <select
-            id="range"
-            name="range"
-            defaultValue={rangeKind}
-            className="border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-          >
-            <option value="today">Today</option>
-            <option value="week">This week</option>
-            <option value="month">This month</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs mb-1" htmlFor="from">
-            From
-          </label>
-          <input
-            id="from"
-            name="from"
-            type="date"
-            defaultValue={from}
-            className="border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-          />
-        </div>
-        <div>
-          <label className="block text-xs mb-1" htmlFor="to">
-            To
-          </label>
-          <input
-            id="to"
-            name="to"
-            type="date"
-            defaultValue={to}
-            className="border rounded px-2 py-1.5 text-sm border-black/20 dark:border-white/20 bg-transparent"
-          />
-        </div>
-        <button
-          type="submit"
-          className="rounded bg-foreground text-background px-3 py-1.5 text-sm"
-        >
-          Apply
-        </button>
-      </form>
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left border-b border-black/10 dark:border-white/10">
-              <th className="py-2 pr-4">Date</th>
-              {methods.map((m) => (
-                <th key={m.id} className="py-2 pr-4">
-                  {m.name}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {dates.map((date) => (
-              <tr key={date} className="border-b border-black/5 dark:border-white/5">
-                <td className="py-2 pr-4 whitespace-nowrap">{date}</td>
-                {methods.map((m) => {
-                  const row = totalsByKey.get(`${date}|${m.id}`);
-                  const { gap, matched } = reconcile(row?.pos_total ?? 0, row?.recorded_total ?? 0);
-                  const hasData = Boolean(row);
-                  return (
-                    <td key={m.id} className="py-1 pr-4">
-                      <Link
-                        href={`/transactions?date=${date}&location=${encodeURIComponent(location)}&paymentMethodId=${m.id}`}
-                        className={`block rounded px-3 py-2 text-xs ${
-                          !hasData
-                            ? "bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40"
-                            : matched
-                              ? "bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200"
-                              : "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200"
-                        }`}
-                      >
-                        {hasData ? (matched ? "Matched" : `Gap ${formatMoney(gap)}`) : "—"}
-                      </Link>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Daily totals per payment method vs. the POS system.
+        </p>
       </div>
+
+      <Card>
+        <CardContent className="pt-5">
+          <form method="get" className="flex flex-wrap items-end gap-3">
+            <div>
+              <Label htmlFor="location">Location</Label>
+              <Select id="location" name="location" defaultValue={location} className="w-32">
+                {locations.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {loc}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="range">Range</Label>
+              <Select id="range" name="range" defaultValue={rangeKind} className="w-36">
+                <option value="today">Today</option>
+                <option value="week">This week</option>
+                <option value="month">This month</option>
+                <option value="custom">Custom</option>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="from">From</Label>
+              <Input id="from" name="from" type="date" defaultValue={from} className="w-40" />
+            </div>
+            <div>
+              <Label htmlFor="to">To</Label>
+              <Input id="to" name="to" type="date" defaultValue={to} className="w-40" />
+            </div>
+            <Button type="submit">Apply</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Date
+                </th>
+                {methods.map((m) => (
+                  <th
+                    key={m.id}
+                    className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  >
+                    {m.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dates.map((date) => (
+                <tr key={date} className="border-b border-border/60 last:border-0">
+                  <td className="py-2 px-4 whitespace-nowrap font-medium">{date}</td>
+                  {methods.map((m) => {
+                    const row = totalsByKey.get(`${date}|${m.id}`);
+                    const { gap, matched } = reconcile(row?.pos_total ?? 0, row?.recorded_total ?? 0);
+                    const hasData = Boolean(row);
+                    return (
+                      <td key={m.id} className="py-1.5 px-4">
+                        <Link
+                          href={`/transactions?date=${date}&location=${encodeURIComponent(location)}&paymentMethodId=${m.id}`}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                            !hasData
+                              ? "bg-muted text-muted-foreground"
+                              : matched
+                                ? "bg-success/15 text-success hover:bg-success/25"
+                                : "bg-destructive/15 text-destructive hover:bg-destructive/25"
+                          )}
+                        >
+                          {hasData ? (
+                            matched ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" /> Matched
+                              </>
+                            ) : (
+                              <>
+                                <TriangleAlert className="h-3.5 w-3.5" /> {formatMoney(gap)}
+                              </>
+                            )
+                          ) : (
+                            "—"
+                          )}
+                        </Link>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
