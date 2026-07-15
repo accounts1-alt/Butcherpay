@@ -1,0 +1,132 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { createConnection } from "./actions";
+
+type ConnType = "csv" | "rest_api" | "postgres" | "webhook";
+
+const FIELD_MAPPING_HINT: Record<string, string> = {
+  csv: "Column names exactly as they appear in the CSV header row.",
+  postgres: "Column names your query's SELECT returns.",
+};
+
+export function NewConnectionForm() {
+  const [type, setType] = useState<ConnType>("csv");
+
+  return (
+    <form action={createConnection} className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="conn-name">Name</Label>
+          <Input id="conn-name" name="name" required placeholder="e.g. Stripe" />
+        </div>
+        <div>
+          <Label htmlFor="conn-type">Type</Label>
+          <Select
+            id="conn-type"
+            name="type"
+            required
+            value={type}
+            onChange={(e) => setType(e.target.value as ConnType)}
+          >
+            <option value="csv">CSV upload (manual)</option>
+            <option value="rest_api">Stripe (API, automated)</option>
+            <option value="postgres">Postgres (automated — e.g. POS via Skyvia)</option>
+            <option value="webhook">Webhook (recorded only, no sync yet)</option>
+          </Select>
+        </div>
+      </div>
+
+      {type === "rest_api" && (
+        <div className="rounded-lg bg-muted/40 p-4 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Use a <strong>restricted, read-only</strong> API key (Stripe Dashboard → Developers →
+            API keys → Create restricted key, with read access to Balance Transactions only).
+          </p>
+          <div>
+            <Label htmlFor="secret_key">Stripe API key</Label>
+            <Input id="secret_key" name="secret_key" type="password" required placeholder="rk_live_..." />
+          </div>
+          <div>
+            <Label htmlFor="rest-location">Location to attribute these sales to</Label>
+            <Input id="rest-location" name="location" required placeholder="e.g. Shop" />
+          </div>
+        </div>
+      )}
+
+      {type === "postgres" && (
+        <div className="rounded-lg bg-muted/40 p-4 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Reads from any external Postgres database — e.g. a POS table an ETL tool like Skyvia
+            keeps in sync. The query must accept the target date as its only parameter (
+            <code>$1</code>) and return columns matching the mapping below.
+          </p>
+          <div>
+            <Label htmlFor="connection_string">Connection string</Label>
+            <Input
+              id="connection_string"
+              name="connection_string"
+              type="password"
+              required
+              placeholder="postgres://user:pass@host:5432/db?sslmode=require"
+            />
+          </div>
+          <div>
+            <Label htmlFor="query">Query</Label>
+            <Input
+              id="query"
+              name="query"
+              required
+              placeholder="select till_date, site, tender_type, amount from pos_totals where till_date = $1"
+              className="font-mono"
+            />
+          </div>
+        </div>
+      )}
+
+      {(type === "csv" || type === "postgres") && (
+        <div className="grid grid-cols-4 gap-3">
+          <div>
+            <Label htmlFor="date_col">Date column</Label>
+            <Input id="date_col" name="date_col" required placeholder="Date" />
+          </div>
+          <div>
+            <Label htmlFor="location_col">Location column</Label>
+            <Input id="location_col" name="location_col" required placeholder="Location" />
+          </div>
+          <div>
+            <Label htmlFor="method_col">Payment method column</Label>
+            <Input id="method_col" name="method_col" required placeholder="Method" />
+          </div>
+          <div>
+            <Label htmlFor="total_col">Total column</Label>
+            <Input id="total_col" name="total_col" required placeholder="Total" />
+          </div>
+          <p className="col-span-4 text-xs text-muted-foreground -mt-1">
+            {FIELD_MAPPING_HINT[type]}
+          </p>
+        </div>
+      )}
+
+      {type === "webhook" && (
+        <p className="text-xs text-muted-foreground rounded-lg bg-muted/40 p-4">
+          Recorded for tracking only — there&apos;s no automated sync for webhooks yet.
+        </p>
+      )}
+
+      {(type === "rest_api" || type === "postgres") && (
+        <p className="text-xs text-muted-foreground">
+          Synced automatically once a day for the previous day — no schedule to set.
+        </p>
+      )}
+
+      <Button type="submit" className="self-start">
+        Add connection
+      </Button>
+    </form>
+  );
+}
