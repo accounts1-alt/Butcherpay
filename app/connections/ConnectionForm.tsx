@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { createConnection } from "./actions";
 
 type ConnType = "csv" | "rest_api" | "postgres" | "webhook";
 
@@ -14,15 +13,48 @@ const FIELD_MAPPING_HINT: Record<string, string> = {
   postgres: "Column names your query's SELECT returns.",
 };
 
-export function NewConnectionForm() {
-  const [type, setType] = useState<ConnType>("csv");
+export type ConnectionFormInitial = {
+  connectionId?: string;
+  name?: string;
+  type?: ConnType;
+  location?: string;
+  query?: string;
+  date_col?: string;
+  location_col?: string;
+  method_col?: string;
+  total_col?: string;
+  hasSecretKey?: boolean;
+  hasConnectionString?: boolean;
+};
+
+export function ConnectionForm({
+  action,
+  submitLabel,
+  initial,
+}: {
+  action: (formData: FormData) => void | Promise<void>;
+  submitLabel: string;
+  initial?: ConnectionFormInitial;
+}) {
+  const [type, setType] = useState<ConnType>(initial?.type ?? "csv");
+  const isEdit = Boolean(initial?.connectionId);
 
   return (
-    <form action={createConnection} className="flex flex-col gap-4">
+    <form action={action} className="flex flex-col gap-4">
+      {initial?.connectionId && (
+        <input type="hidden" name="connection_id" value={initial.connectionId} />
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label htmlFor="conn-name">Name</Label>
-          <Input id="conn-name" name="name" required placeholder="e.g. Stripe" />
+          <Input
+            id="conn-name"
+            name="name"
+            required
+            placeholder="e.g. Stripe"
+            defaultValue={initial?.name}
+          />
         </div>
         <div>
           <Label htmlFor="conn-type">Type</Label>
@@ -48,12 +80,26 @@ export function NewConnectionForm() {
             API keys → Create restricted key, with read access to Balance Transactions only).
           </p>
           <div>
-            <Label htmlFor="secret_key">Stripe API key</Label>
-            <Input id="secret_key" name="secret_key" type="password" required placeholder="rk_live_..." />
+            <Label htmlFor="secret_key">
+              Stripe API key{isEdit && initial?.hasSecretKey ? " (leave blank to keep current)" : ""}
+            </Label>
+            <Input
+              id="secret_key"
+              name="secret_key"
+              type="password"
+              required={!isEdit}
+              placeholder={isEdit && initial?.hasSecretKey ? "••••••••" : "rk_live_..."}
+            />
           </div>
           <div>
             <Label htmlFor="rest-location">Location to attribute these sales to</Label>
-            <Input id="rest-location" name="location" required placeholder="e.g. Shop" />
+            <Input
+              id="rest-location"
+              name="location"
+              required
+              placeholder="e.g. Shop"
+              defaultValue={initial?.location}
+            />
           </div>
         </div>
       )}
@@ -66,13 +112,20 @@ export function NewConnectionForm() {
             <code>$1</code>) and return columns matching the mapping below.
           </p>
           <div>
-            <Label htmlFor="connection_string">Connection string</Label>
+            <Label htmlFor="connection_string">
+              Connection string
+              {isEdit && initial?.hasConnectionString ? " (leave blank to keep current)" : ""}
+            </Label>
             <Input
               id="connection_string"
               name="connection_string"
               type="password"
-              required
-              placeholder="postgres://user:pass@host:5432/db?sslmode=require"
+              required={!isEdit}
+              placeholder={
+                isEdit && initial?.hasConnectionString
+                  ? "••••••••"
+                  : "postgres://user:pass@host:5432/db?sslmode=require"
+              }
             />
           </div>
           <div>
@@ -83,6 +136,7 @@ export function NewConnectionForm() {
               required
               placeholder="select till_date, site, tender_type, amount from pos_totals where till_date = $1"
               className="font-mono"
+              defaultValue={initial?.query}
             />
           </div>
         </div>
@@ -92,19 +146,37 @@ export function NewConnectionForm() {
         <div className="grid grid-cols-4 gap-3">
           <div>
             <Label htmlFor="date_col">Date column</Label>
-            <Input id="date_col" name="date_col" required placeholder="Date" />
+            <Input id="date_col" name="date_col" required placeholder="Date" defaultValue={initial?.date_col} />
           </div>
           <div>
             <Label htmlFor="location_col">Location column</Label>
-            <Input id="location_col" name="location_col" required placeholder="Location" />
+            <Input
+              id="location_col"
+              name="location_col"
+              required
+              placeholder="Location"
+              defaultValue={initial?.location_col}
+            />
           </div>
           <div>
             <Label htmlFor="method_col">Payment method column</Label>
-            <Input id="method_col" name="method_col" required placeholder="Method" />
+            <Input
+              id="method_col"
+              name="method_col"
+              required
+              placeholder="Method"
+              defaultValue={initial?.method_col}
+            />
           </div>
           <div>
             <Label htmlFor="total_col">Total column</Label>
-            <Input id="total_col" name="total_col" required placeholder="Total" />
+            <Input
+              id="total_col"
+              name="total_col"
+              required
+              placeholder="Total"
+              defaultValue={initial?.total_col}
+            />
           </div>
           <p className="col-span-4 text-xs text-muted-foreground -mt-1">
             {FIELD_MAPPING_HINT[type]}
@@ -125,7 +197,7 @@ export function NewConnectionForm() {
       )}
 
       <Button type="submit" className="self-start">
-        Add connection
+        {submitLabel}
       </Button>
     </form>
   );

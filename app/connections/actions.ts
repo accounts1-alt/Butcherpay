@@ -1,6 +1,7 @@
 "use server";
 
 import Papa from "papaparse";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
 import { isPosFieldMapping, mapRows, upsertPosDailyTotals } from "@/lib/posSync";
@@ -16,44 +17,111 @@ function fieldMappingFromForm(formData: FormData): Record<string, string> {
   };
 }
 
+// Shared by create and update: builds config/field_mapping/sync_schedule
+// from the type-specific form fields. For edits, an empty secret_key or
+// connection_string means "leave the existing value alone" (the form shows
+// these masked and blank rather than round-tripping the real secret back to
+// the client).
+function connectionFieldsFromForm(
+  formData: FormData,
+  type: ConnectionType,
+  existingConfig?: Record<string, unknown>
+): { config: Record<string, unknown>; field_mapping: Record<string, unknown>; sync_schedule: string | null } {
+  if (type === "rest_api") {
+    const secret_key = String(formData.get("secret_key") ?? "").trim();
+    const location = String(formData.get("location") ?? "").trim();
+    if (!location) throw new Error("Stripe connections need a location");
+    if (!secret_key && !existingConfig?.secret_key) {
+      throw new Error("Stripe connections need an API key");
+    }
+    return {
+      config: {
+        provider: "stripe",
+        secret_key: secret_key || existingConfig?.secret_key,
+        location,
+      },
+      field_mapping: {},
+      sync_schedule: "0 5 * * *",
+    };
+  }
+
+  if (type === "postgres") {
+    const connection_string = String(formData.get("connection_string") ?? "").trim();
+    const query = String(formData.get("query") ?? "").trim();
+    if (!query) throw new Error("Postgres connections need a query");
+    if (!connection_string && !existingConfig?.connection_string) {
+      throw new Error("Postgres connections need a connection string");
+    }
+    return {
+      config: {
+        connection_string: connection_string || existingConfig?.connection_string,
+        query,
+      },
+      field_mapping: fieldMappingFromForm(formData),
+      sync_schedule: "0 5 * * *",
+    };
+  }
+
+  if (type === "csv") {
+    return { config: {}, field_mapping: fieldMappingFromForm(formData), sync_schedule: null };
+  }
+
+  return { config: {}, field_mapping: {}, sync_schedule: null };
+}
+
 export async function createConnection(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const type = String(formData.get("type") ?? "") as ConnectionType;
 
   if (!name || !type) throw new Error("Name and type are required");
 
-  let config: Record<string, unknown> = {};
-  let field_mapping: Record<string, unknown> = {};
-  // The cron job runs once daily for every non-CSV connection — there's no
-  // per-connection schedule to configure, this is purely descriptive.
-  let sync_schedule: string | null = null;
-
-  if (type === "csv") {
-    field_mapping = fieldMappingFromForm(formData);
-  } else if (type === "rest_api") {
-    const secret_key = String(formData.get("secret_key") ?? "").trim();
-    const location = String(formData.get("location") ?? "").trim();
-    if (!secret_key || !location) {
-      throw new Error("Stripe connections need an API key and a location");
-    }
-    config = { provider: "stripe", secret_key, location };
-    sync_schedule = "0 5 * * *";
-  } else if (type === "postgres") {
-    const connection_string = String(formData.get("connection_string") ?? "").trim();
-    const query = String(formData.get("query") ?? "").trim();
-    if (!connection_string || !query) {
-      throw new Error("Postgres connections need a connection string and a query");
-    }
-    config = { connection_string, query };
-    field_mapping = fieldMappingFromForm(formData);
-    sync_schedule = "0 5 * * *";
-  }
+  const { config, field_mapping, sync_schedule } = connectionFieldsFromForm(formData, type);
 
   const { error } = await supabaseServer()
     .from("connections")
     .insert({ name, type, config, field_mapping, sync_schedule });
 
   if (error) throw new Error(error.message);
+  revalidatePath("/connections");
+}
+
+export async function updateConnection(formData: FormData) {
+  const connectionId = String(formData.get("connection_id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const type = String(formData.get("type") ?? "") as ConnectionType;
+  if (!connectionId || !name || !type) throw new Error("Missing connection, name, or type");
+
+  const supabase = supabaseServer();
+  const { data: existing, error: fetchError } = await supabase
+    .from("connections")
+    .select("*")
+    .eq("id", connectionId)
+    .single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  const { config, field_mapping, sync_schedule } = connectionFieldsFromForm(
+    formData,
+    type,
+    existing.config
+  );
+
+  const { error } = await supabase
+    .from("connections")
+    .update({ name, type, config, field_mapping, sync_schedule })
+    .eq("id", connectionId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/connections");
+  redirect("/connections");
+}
+
+export async function deleteConnection(formData: FormData) {
+  const connectionId = String(formData.get("connection_id") ?? "");
+  if (!connectionId) throw new Error("Missing connection");
+
+  const { error } = await supabaseServer().from("connections").delete().eq("id", connectionId);
+  if (error) throw new Error(error.message);
+
   revalidatePath("/connections");
 }
 
@@ -75,9 +143,15 @@ export async function syncCsvConnection(formData: FormData) {
   if (connError) throw new Error(connError.message);
 
   if (!isPosFieldMapping(connection.field_mapping)) {
-    throw new Error(
-      "This connection's field_mapping must have date, location, payment_method, and total keys"
-    );
+    await supabase
+      .from("connections")
+      .update({
+        status: "failing",
+        last_error: "field_mapping must have date, location, payment_method, and total keys",
+      })
+      .eq("id", connectionId);
+    revalidatePath("/connections");
+    return;
   }
 
   try {
@@ -95,11 +169,14 @@ export async function syncCsvConnection(formData: FormData) {
 
     await supabase
       .from("connections")
-      .update({ last_synced_at: new Date().toISOString(), status: "healthy" })
+      .update({ last_synced_at: new Date().toISOString(), status: "healthy", last_error: null })
       .eq("id", connectionId);
   } catch (err) {
-    await supabase.from("connections").update({ status: "failing" }).eq("id", connectionId);
-    throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    await supabase
+      .from("connections")
+      .update({ status: "failing", last_error: message })
+      .eq("id", connectionId);
   }
 
   revalidatePath("/connections");

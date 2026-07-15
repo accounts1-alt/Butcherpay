@@ -4,15 +4,20 @@ import type { ConnectionRow, Database } from "@/lib/supabase/types";
 import { syncStripeConnection } from "./stripeSync";
 import { syncPostgresConnection } from "./postgresSync";
 
+export type SyncResult = { ok: true } | { ok: false; error: string };
+
 // Single place that knows how to run any automated (non-CSV) connection type
 // for a given date, and marks the connection healthy/failing afterwards.
 // Shared by the daily cron job and the manual "Sync now" action so the two
-// never drift apart.
+// never drift apart. Never throws -- the outcome (including the error
+// message) is persisted on the connection row itself, since Next.js redacts
+// thrown Server Action errors to a generic message in production and there's
+// no other way to see why a sync failed.
 export async function syncConnection(
   supabase: SupabaseClient<Database>,
   connection: ConnectionRow,
   date: string
-): Promise<void> {
+): Promise<SyncResult> {
   try {
     if (connection.type === "rest_api") {
       const provider = (connection.config as Record<string, unknown> | null)?.provider;
@@ -29,11 +34,16 @@ export async function syncConnection(
 
     await supabase
       .from("connections")
-      .update({ last_synced_at: new Date().toISOString(), status: "healthy" })
+      .update({ last_synced_at: new Date().toISOString(), status: "healthy", last_error: null })
       .eq("id", connection.id);
+    return { ok: true };
   } catch (err) {
-    await supabase.from("connections").update({ status: "failing" }).eq("id", connection.id);
-    throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    await supabase
+      .from("connections")
+      .update({ status: "failing", last_error: message })
+      .eq("id", connection.id);
+    return { ok: false, error: message };
   }
 }
 
