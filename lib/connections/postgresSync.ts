@@ -9,6 +9,12 @@ export type PostgresConnectionConfig = {
   // columns matching the connection's field_mapping, e.g.:
   //   select till_date, site, tender_type, amount from pos_totals where till_date = $1
   query: string;
+  // Optional PEM CA certificate (e.g. Supabase's, from Database Settings ->
+  // SSL Configuration). Supabase's pooler presents a chain that Node's
+  // default trust store rejects as "self-signed certificate in certificate
+  // chain" unless this is supplied -- providing it keeps verification on
+  // (rejectUnauthorized stays true) rather than disabling it.
+  ca_certificate?: string;
 };
 
 export function isPostgresConnectionConfig(value: unknown): value is PostgresConnectionConfig {
@@ -18,15 +24,14 @@ export function isPostgresConnectionConfig(value: unknown): value is PostgresCon
     typeof v.connection_string === "string" &&
     v.connection_string.length > 0 &&
     typeof v.query === "string" &&
-    v.query.length > 0
+    v.query.length > 0 &&
+    (v.ca_certificate === undefined || typeof v.ca_certificate === "string")
   );
 }
 
 // Reads from any external Postgres database (e.g. a POS table synced there by
 // a third-party ETL tool like Skyvia) using a connection-supplied,
 // parameterized query, then maps and upserts exactly like the CSV path.
-// SSL is left to the connection string's own sslmode (e.g. ?sslmode=require)
-// rather than overridden here, so certificate verification is never disabled.
 export async function syncPostgresConnection(
   supabase: SupabaseClient<Database>,
   connection: ConnectionRow,
@@ -41,7 +46,12 @@ export async function syncPostgresConnection(
     );
   }
 
-  const client = new Client({ connectionString: connection.config.connection_string });
+  const client = new Client({
+    connectionString: connection.config.connection_string,
+    ssl: connection.config.ca_certificate
+      ? { ca: connection.config.ca_certificate, rejectUnauthorized: true }
+      : undefined,
+  });
   await client.connect();
 
   let rows: Record<string, unknown>[];

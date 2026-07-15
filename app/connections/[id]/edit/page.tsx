@@ -32,6 +32,7 @@ export default async function EditConnectionPage({
     hasSecretKey: typeof config.secret_key === "string" && config.secret_key.length > 0,
     hasConnectionString:
       typeof config.connection_string === "string" && config.connection_string.length > 0,
+    hasCaCertificate: typeof config.ca_certificate === "string" && config.ca_certificate.length > 0,
     date_col: mapping?.date,
     location_col: mapping?.location,
     method_col: mapping?.payment_method,
