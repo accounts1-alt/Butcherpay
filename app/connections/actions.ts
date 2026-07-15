@@ -48,6 +48,7 @@ function connectionFieldsFromForm(
   if (type === "postgres") {
     const connection_string = String(formData.get("connection_string") ?? "").trim();
     const query = String(formData.get("query") ?? "").trim();
+    const ca_certificate = String(formData.get("ca_certificate") ?? "").trim();
     if (!query) throw new Error("Postgres connections need a query");
     if (!connection_string && !existingConfig?.connection_string) {
       throw new Error("Postgres connections need a connection string");
@@ -56,6 +57,7 @@ function connectionFieldsFromForm(
       config: {
         connection_string: connection_string || existingConfig?.connection_string,
         query,
+        ca_certificate: ca_certificate || existingConfig?.ca_certificate,
       },
       field_mapping: fieldMappingFromForm(formData),
       sync_schedule: "0 5 * * *",

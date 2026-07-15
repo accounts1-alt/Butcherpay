@@ -22,4 +22,24 @@ describe("isPostgresConnectionConfig", () => {
   it("rejects non-objects", () => {
     expect(isPostgresConnectionConfig(null)).toBe(false);
   });
+
+  it("accepts an optional ca_certificate", () => {
+    expect(
+      isPostgresConnectionConfig({
+        connection_string: "postgres://user:pass@host:5432/db?sslmode=require",
+        query: "select 1",
+        ca_certificate: "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----",
+      })
+    ).toBe(true);
+  });
+
+  it("rejects a non-string ca_certificate", () => {
+    expect(
+      isPostgresConnectionConfig({
+        connection_string: "postgres://user:pass@host:5432/db",
+        query: "select 1",
+        ca_certificate: 123,
+      })
+    ).toBe(false);
+  });
 });

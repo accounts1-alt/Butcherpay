@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type ConnType = "csv" | "rest_api" | "postgres" | "webhook";
 
@@ -25,6 +26,7 @@ export type ConnectionFormInitial = {
   total_col?: string;
   hasSecretKey?: boolean;
   hasConnectionString?: boolean;
+  hasCaCertificate?: boolean;
 };
 
 export function ConnectionForm({
@@ -138,6 +140,28 @@ export function ConnectionForm({
               className="font-mono"
               defaultValue={initial?.query}
             />
+          </div>
+          <div>
+            <Label htmlFor="ca_certificate">
+              CA certificate (optional — fixes &quot;self-signed certificate in certificate
+              chain&quot; on Supabase poolers)
+              {isEdit && initial?.hasCaCertificate ? ", leave blank to keep current" : ""}
+            </Label>
+            <Textarea
+              id="ca_certificate"
+              name="ca_certificate"
+              rows={3}
+              className="font-mono text-xs"
+              placeholder={
+                isEdit && initial?.hasCaCertificate
+                  ? "•••••••• (already set)"
+                  : "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+              }
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              From that database&apos;s Supabase project: Database Settings → SSL Configuration →
+              download the CA certificate, then paste its contents here.
+            </p>
           </div>
         </div>
       )}
