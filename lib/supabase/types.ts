@@ -67,6 +67,7 @@ export type ConnectionRow = {
   sync_schedule: string | null;
   last_synced_at: string | null;
   status: ConnectionStatus;
+  last_error: string | null;
 };
 
 export type PosDailyTotalRow = {

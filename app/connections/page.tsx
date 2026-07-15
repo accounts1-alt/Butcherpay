@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { ConnectionRow } from "@/lib/supabase/types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -11,8 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { NewConnectionForm } from "./NewConnectionForm";
-import { syncCsvConnection, syncConnectionNow } from "./actions";
+import { ConnectionForm } from "./ConnectionForm";
+import { DeleteConnectionButton } from "./DeleteConnectionButton";
+import { createConnection, syncCsvConnection, syncConnectionNow } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -75,31 +77,47 @@ export default async function ConnectionsPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[conn.status] ?? "muted"}>{conn.status}</Badge>
+                    {conn.status === "failing" && conn.last_error && (
+                      <p className="mt-1 max-w-xs text-xs text-destructive break-words">
+                        {conn.last_error}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell>
-                    {conn.type === "csv" && (
-                      <form action={syncCsvConnection} className="flex items-center gap-2">
-                        <input type="hidden" name="connection_id" value={conn.id} />
-                        <input
-                          type="file"
-                          name="file"
-                          accept=".csv,text/csv"
-                          required
-                          className="text-xs file:mr-2 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1 file:text-xs"
-                        />
-                        <Button type="submit" size="sm">
-                          Sync
-                        </Button>
-                      </form>
-                    )}
-                    {(conn.type === "postgres" || conn.type === "rest_api") && (
-                      <form action={syncConnectionNow}>
-                        <input type="hidden" name="connection_id" value={conn.id} />
-                        <Button type="submit" size="sm" variant="outline">
-                          Sync now
-                        </Button>
-                      </form>
-                    )}
+                    <div className="flex flex-col items-start gap-2">
+                      {conn.type === "csv" && (
+                        <form action={syncCsvConnection} className="flex items-center gap-2">
+                          <input type="hidden" name="connection_id" value={conn.id} />
+                          <input
+                            type="file"
+                            name="file"
+                            accept=".csv,text/csv"
+                            required
+                            className="text-xs file:mr-2 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1 file:text-xs"
+                          />
+                          <Button type="submit" size="sm">
+                            Sync
+                          </Button>
+                        </form>
+                      )}
+                      {(conn.type === "postgres" || conn.type === "rest_api") && (
+                        <form action={syncConnectionNow}>
+                          <input type="hidden" name="connection_id" value={conn.id} />
+                          <Button type="submit" size="sm" variant="outline">
+                            Sync now
+                          </Button>
+                        </form>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <Link
+                          href={`/connections/${conn.id}/edit`}
+                          className={buttonVariants({ size: "sm", variant: "ghost" })}
+                        >
+                          Edit
+                        </Link>
+                        <DeleteConnectionButton connectionId={conn.id} name={conn.name} />
+                      </div>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -120,7 +138,7 @@ export default async function ConnectionsPage() {
           <CardTitle className="text-base font-semibold text-foreground">Add a connection</CardTitle>
         </CardHeader>
         <CardContent>
-          <NewConnectionForm />
+          <ConnectionForm action={createConnection} submitLabel="Add connection" />
         </CardContent>
       </Card>
     </div>

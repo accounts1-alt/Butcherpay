@@ -31,18 +31,10 @@ export async function GET(request: Request) {
   }
 
   const results = await Promise.all(
-    ((connections ?? []) as ConnectionRow[]).map(async (connection) => {
-      try {
-        await syncConnection(supabase, connection, date);
-        return { connection: connection.name, ok: true };
-      } catch (err) {
-        return {
-          connection: connection.name,
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        };
-      }
-    })
+    ((connections ?? []) as ConnectionRow[]).map(async (connection) => ({
+      connection: connection.name,
+      ...(await syncConnection(supabase, connection, date)),
+    }))
   );
 
   return Response.json({ date, results });
