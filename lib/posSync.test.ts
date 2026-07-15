@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPosCsvFieldMapping, mapCsvRows } from "./csvSync";
+import { isPosFieldMapping, mapRows } from "./posSync";
 
 const mapping = {
   date: "Date",
@@ -8,9 +8,9 @@ const mapping = {
   total: "Total",
 };
 
-describe("mapCsvRows", () => {
+describe("mapRows", () => {
   it("maps rows according to the field mapping", () => {
-    const result = mapCsvRows(
+    const result = mapRows(
       [{ Date: "2026-07-01", Location: "Shop", Method: "card", Total: "123.45" }],
       mapping
     );
@@ -19,8 +19,18 @@ describe("mapCsvRows", () => {
     ]);
   });
 
+  it("handles native (non-string) values from a DB row", () => {
+    const result = mapRows(
+      [{ Date: new Date("2026-07-01T00:00:00Z"), Location: "Shop", Method: "card", Total: 99.5 }],
+      mapping
+    );
+    expect(result).toEqual([
+      { date: "2026-07-01", location: "Shop", paymentMethodName: "card", total: 99.5 },
+    ]);
+  });
+
   it("drops rows with a missing field", () => {
-    const result = mapCsvRows(
+    const result = mapRows(
       [{ Date: "2026-07-01", Location: "", Method: "card", Total: "100" }],
       mapping
     );
@@ -28,7 +38,7 @@ describe("mapCsvRows", () => {
   });
 
   it("drops rows with a non-numeric total", () => {
-    const result = mapCsvRows(
+    const result = mapRows(
       [{ Date: "2026-07-01", Location: "Shop", Method: "card", Total: "not-a-number" }],
       mapping
     );
@@ -36,17 +46,17 @@ describe("mapCsvRows", () => {
   });
 });
 
-describe("isPosCsvFieldMapping", () => {
+describe("isPosFieldMapping", () => {
   it("accepts a well-formed mapping", () => {
-    expect(isPosCsvFieldMapping(mapping)).toBe(true);
+    expect(isPosFieldMapping(mapping)).toBe(true);
   });
 
   it("rejects a mapping missing a key", () => {
-    expect(isPosCsvFieldMapping({ date: "Date" })).toBe(false);
+    expect(isPosFieldMapping({ date: "Date" })).toBe(false);
   });
 
   it("rejects non-objects", () => {
-    expect(isPosCsvFieldMapping(null)).toBe(false);
-    expect(isPosCsvFieldMapping("nope")).toBe(false);
+    expect(isPosFieldMapping(null)).toBe(false);
+    expect(isPosFieldMapping("nope")).toBe(false);
   });
 });

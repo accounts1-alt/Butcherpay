@@ -3,10 +3,6 @@ import type { ConnectionRow } from "@/lib/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -15,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { createConnection, syncCsvConnection } from "./actions";
+import { NewConnectionForm } from "./NewConnectionForm";
+import { syncCsvConnection, syncConnectionNow } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +20,13 @@ const STATUS_VARIANT: Record<string, "success" | "destructive" | "muted"> = {
   healthy: "success",
   failing: "destructive",
   disabled: "muted",
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  csv: "CSV",
+  rest_api: "API",
+  postgres: "Postgres",
+  webhook: "Webhook",
 };
 
 export default async function ConnectionsPage() {
@@ -40,7 +44,8 @@ export default async function ConnectionsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Connections</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          External systems this app reads POS totals from.
+          External systems this app reads POS totals from. Stripe and Postgres connections sync
+          automatically once a day; CSV is manual/backfill only.
         </p>
       </div>
 
@@ -61,8 +66,10 @@ export default async function ConnectionsPage() {
               {rows.map((conn) => (
                 <TableRow key={conn.id} className="align-top">
                   <TableCell className="font-medium">{conn.name}</TableCell>
-                  <TableCell className="uppercase text-xs text-muted-foreground">{conn.type}</TableCell>
-                  <TableCell>{conn.sync_schedule ?? "Manual"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {TYPE_LABEL[conn.type] ?? conn.type}
+                  </TableCell>
+                  <TableCell>{conn.sync_schedule ? "Daily" : "Manual"}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {conn.last_synced_at ? new Date(conn.last_synced_at).toLocaleString() : "Never"}
                   </TableCell>
@@ -85,6 +92,14 @@ export default async function ConnectionsPage() {
                         </Button>
                       </form>
                     )}
+                    {(conn.type === "postgres" || conn.type === "rest_api") && (
+                      <form action={syncConnectionNow}>
+                        <input type="hidden" name="connection_id" value={conn.id} />
+                        <Button type="submit" size="sm" variant="outline">
+                          Sync now
+                        </Button>
+                      </form>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -100,55 +115,12 @@ export default async function ConnectionsPage() {
         </CardContent>
       </Card>
 
-      <Card className="max-w-lg">
+      <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-foreground">Add a connection</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Only the <code className="text-xs">csv</code> type has a working sync today — upload a
-            POS export and it upserts into <code className="text-xs">pos_daily_totals</code> using
-            the field mapping below. Other types can be recorded here for tracking but have no
-            automated sync yet.
-          </p>
         </CardHeader>
         <CardContent>
-          <form action={createConnection} className="flex flex-col gap-4">
-            <div>
-              <Label htmlFor="conn-name">Name</Label>
-              <Input id="conn-name" name="name" required placeholder="e.g. Semtek POS" />
-            </div>
-            <div>
-              <Label htmlFor="conn-type">Type</Label>
-              <Select id="conn-type" name="type" required defaultValue="csv">
-                <option value="csv">CSV upload</option>
-                <option value="postgres">Postgres</option>
-                <option value="rest_api">REST API</option>
-                <option value="webhook">Webhook</option>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="conn-field-mapping">
-                Field mapping (JSON — for CSV: date, location, payment_method, total column names)
-              </Label>
-              <Textarea
-                id="conn-field-mapping"
-                name="field_mapping"
-                rows={3}
-                defaultValue={'{\n  "date": "Date",\n  "location": "Location",\n  "payment_method": "Method",\n  "total": "Total"\n}'}
-                className="font-mono"
-              />
-            </div>
-            <div>
-              <Label htmlFor="conn-config">Config (JSON — credentials/settings, empty for CSV)</Label>
-              <Textarea id="conn-config" name="config" rows={2} defaultValue="{}" className="font-mono" />
-            </div>
-            <div>
-              <Label htmlFor="conn-schedule">Sync schedule (cron, optional — leave blank for manual)</Label>
-              <Input id="conn-schedule" name="sync_schedule" placeholder="0 6 * * *" />
-            </div>
-            <Button type="submit" className="self-start">
-              Add connection
-            </Button>
-          </form>
+          <NewConnectionForm />
         </CardContent>
       </Card>
     </div>
